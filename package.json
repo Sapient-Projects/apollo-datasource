@@ -1,0 +1,21 @@
+{
+  "name": "gql_security",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "apollo-datasource-mongodb": "^0.5.2",
+    "apollo-server": "latest",
+    "apollo-server-errors": "latest",
+    "graphql": "latest",
+    "jwt-decode": "latest",
+    "mongodb": "^4.1.4"
+  }
+}
