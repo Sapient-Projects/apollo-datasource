@@ -1,6 +1,13 @@
 const { ApolloServer, gql } = require("apollo-server");
 const { products } = require("./data");
-const { getUser, forAdminOnly, forAdminAndUser, client } = require("./util");
+const {
+  getUser,
+  forAdminOnly,
+  forAdminAndUser,
+  client,
+  uid,
+  forUserOnly,
+} = require("./util");
 const { AuthenticationError } = require("apollo-server-errors");
 const { Products } = require("./datasources");
 
@@ -13,45 +20,43 @@ const typeDefs = gql`
   }
 
   type Query {
-    products: [Product!]!
-    product(id: ID!): Product
-    productForEveryone(id: ID!): [Product]
+    productForUser(id: ID!): Product
+    productForAdmin(id: ID!): Product
+    productForUserAndAdmin(id: ID!): Product
   }
 `;
 
 const resolvers = {
   Query: {
-    product: (_, __, context) => {
+    productForUser: (_, args, context) => {
       const payload = JSON.parse(context.user);
-
-      if (payload && forAdminAndUser(payload.roles)) {
-        return context.dataSources.products.getProductById(__.id);
-      } else {
-        throw new AuthenticationError(
-          "user not authorized for this operation..."
-        );
+      if (payload && payload.uid === uid && forUserOnly(payload.roles)) {
+        return context.dataSources.products.getProductById(args.id);
+      } else if (!payload) {
+        throw new AuthenticationError("log in first...");
+      } else if (payload.uid !== uid || !forUserOnly(payload.roles)) {
+        throw new AuthenticationError("access denied...");
       }
     },
-    products: (_, __, context) => {
+    productForAdmin: (_, args, context) => {
       const payload = JSON.parse(context.user);
-      if (payload && forAdminOnly(payload.roles)) {
-        return context.dataSources.products.getAllProducts();
-      } else {
-        throw new AuthenticationError(
-          "user not authorized for this operation..."
-        );
+      if (payload && payload.uid === uid && forAdminOnly(payload.roles)) {
+        return context.dataSources.products.getProductById(args.id);
+      } else if (!payload) {
+        throw new AuthenticationError("log in first...");
+      } else if (payload.uid !== uid || !forAdminOnly(payload.roles)) {
+        throw new AuthenticationError("access denied...");
       }
     },
-    productForEveryone: (_, args, context) => {
+    productForUserAndAdmin: (_, args, context) => {
       const payload = JSON.parse(context.user);
 
-      if (payload && forAdminAndUser(payload.roles)) {
-        // return products.find((product) => product.id === args.id);
-        return context.dataSources.products.getProductByFields(args.id);
-      } else {
-        throw new AuthenticationError(
-          "user not authorized for this operation..."
-        );
+      if (payload && payload.uid === uid && forAdminAndUser(payload.roles)) {
+        return context.dataSources.products.getProductById(args.id);
+      } else if (!payload) {
+        throw new AuthenticationError("log in first...");
+      } else if (payload.uid !== uid || !forAdminAndUser(payload.roles)) {
+        throw new AuthenticationError("access denied...");
       }
     },
   },

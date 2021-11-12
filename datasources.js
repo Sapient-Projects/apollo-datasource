@@ -1,7 +1,6 @@
 const { MongoDataSource } = require("apollo-datasource-mongodb");
 const { AuthenticationError } = require("apollo-server-errors");
-const uid = "12asd34";
-
+const uid = require("./util");
 class Products extends MongoDataSource {
   getProductById(id) {
     // console.log("id = " + id);
@@ -11,11 +10,13 @@ class Products extends MongoDataSource {
     return this.collection;
   }
   getProductByFields(id) {
-    const user = JSON.parse(this.context.user)
+    const user = JSON.parse(this.context.user);
     if (user.uid === uid) {
       return this.findByFields({ id });
     } else {
-      throw new AuthenticationError("user not authorized to perform this operation...")
+      throw new AuthenticationError(
+        "user not authorized to perform this operation..."
+      );
     }
   }
 }
