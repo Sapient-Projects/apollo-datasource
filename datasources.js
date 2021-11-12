@@ -3,8 +3,12 @@ const { AuthenticationError } = require("apollo-server-errors");
 const uid = "12asd34";
 
 class Products extends MongoDataSource {
-  getProduct(id) {
+  getProductById(id) {
+    // console.log("id = " + id);
     return this.findOneById(id);
+  }
+  getAllProducts() {
+    return this.collection;
   }
   getProductByFields(id) {
     const user = JSON.parse(this.context.user)

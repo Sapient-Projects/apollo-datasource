@@ -14,6 +14,7 @@
     "apollo-datasource-mongodb": "^0.5.2",
     "apollo-server": "latest",
     "apollo-server-errors": "latest",
+    "dotenv": "^10.0.0",
     "graphql": "latest",
     "jwt-decode": "latest",
     "mongodb": "^4.1.4"

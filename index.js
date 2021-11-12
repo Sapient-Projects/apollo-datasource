@@ -1,27 +1,39 @@
 const { ApolloServer, gql } = require("apollo-server");
 const { products } = require("./data");
-const { getUser, forAdminOnly, forEveryone, client } = require("./util");
+const { getUser, forAdminOnly, forAdminAndUser, client } = require("./util");
 const { AuthenticationError } = require("apollo-server-errors");
 const { Products } = require("./datasources");
 
 const typeDefs = gql`
   type Product {
-    id: ID!
+    upc: ID!
     name: String!
-    qty: Int!
+    weight: Int!
+    price: Int!
   }
 
   type Query {
     products: [Product!]!
+    product(id: ID!): Product
     productForEveryone(id: ID!): [Product]
   }
 `;
 
 const resolvers = {
   Query: {
-    products: (_, __, context) => {
+    product: (_, __, context) => {
       const payload = JSON.parse(context.user);
 
+      if (payload && forAdminAndUser(payload.roles)) {
+        return context.dataSources.products.getProductById(__.id);
+      } else {
+        throw new AuthenticationError(
+          "user not authorized for this operation..."
+        );
+      }
+    },
+    products: (_, __, context) => {
+      const payload = JSON.parse(context.user);
       if (payload && forAdminOnly(payload.roles)) {
         return context.dataSources.products.getAllProducts();
       } else {
@@ -33,7 +45,7 @@ const resolvers = {
     productForEveryone: (_, args, context) => {
       const payload = JSON.parse(context.user);
 
-      if (payload && forEveryone(payload.roles)) {
+      if (payload && forAdminAndUser(payload.roles)) {
         // return products.find((product) => product.id === args.id);
         return context.dataSources.products.getProductByFields(args.id);
       } else {

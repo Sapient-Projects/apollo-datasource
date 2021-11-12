@@ -1,7 +1,8 @@
 const jwt_decode = require("jwt-decode");
 const { MongoClient } = require("mongodb");
+require("dotenv").config();
 
-const mongodbConnectionString = "mongodb://localhost/test";
+const mongodbConnectionString = `mongodb://${process.env.MONGODB_USERNAME}:${process.env.MONGODB_PASSWORD}@localhost/demo?authSource=admin`;
 const client = new MongoClient(mongodbConnectionString);
 client.connect();
 
@@ -20,7 +21,7 @@ const isUser = (roles) => {
   return roles.includes("USER");
 };
 
-const forEveryone = (roles) => {
+const forAdminAndUser = (roles) => {
   return isAdmin(roles) || isUser(roles);
 };
 
@@ -30,7 +31,7 @@ const forAdminOnly = (roles) => {
 
 module.exports = {
   getUser,
-  forEveryone,
+  forAdminAndUser,
   forAdminOnly,
   client,
 };
