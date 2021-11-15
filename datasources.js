@@ -7,7 +7,7 @@ class Products extends MongoDataSource {
     return this.findOneById(id);
   }
   getAllProducts() {
-    return this.collection;
+    return this.collection.find(32);
   }
   getProductByFields(id) {
     const user = JSON.parse(this.context.user);

@@ -10,6 +10,8 @@ const {
 } = require("./util");
 const { AuthenticationError } = require("apollo-server-errors");
 const { Products } = require("./datasources");
+const { makeExecutableSchema } = require("@graphql-tools/schema");
+const { uppercaseDirectiveTransformer } = require("./directive");
 
 const typeDefs = gql`
   type Product {
@@ -23,7 +25,10 @@ const typeDefs = gql`
     productForUser(id: ID!): Product
     productForAdmin(id: ID!): Product
     productForUserAndAdmin(id: ID!): Product
+    uppercasedirectiveTest: String @uppercase
   }
+
+  directive @uppercase on FIELD_DEFINITION
 `;
 
 const resolvers = {
@@ -59,20 +64,27 @@ const resolvers = {
         throw new AuthenticationError("access denied...");
       }
     },
+    uppercasedirectiveTest: () => "hello World!",
   },
 };
 
-const server = new ApolloServer({
+let schema = makeExecutableSchema({
   typeDefs,
   resolvers,
-  context: ({ req }) => {
-    const token = req.headers.authorization || "";
-    const user = getUser(token);
-    return { user };
-  },
-  dataSources: () => ({
-    products: new Products(client.db().collection("products")),
-  }),
+});
+
+schema = uppercaseDirectiveTransformer(schema, "uppercase");  
+
+const server = new ApolloServer({
+  schema
+  // context: ({ req }) => {
+  //   const token = req.headers.authorization || "";
+  //   const user = getUser(token);
+  //   return { user };
+  // },
+  // dataSources: () => ({
+  //   products: new Products(client.db().collection("products")),
+  // }),
 });
 
 server

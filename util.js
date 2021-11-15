@@ -9,10 +9,14 @@ const client = new MongoClient(mongodbConnectionString);
 client.connect();
 
 const getUser = (token) => {
-  if (!token) return null;
-  const strippedToken = token.slice(7);
-  const payload = jwt_decode(strippedToken);
-  return JSON.stringify(payload);
+  try {
+    if (!token) return null;
+    const strippedToken = token.slice(7);
+    const payload = jwt_decode(strippedToken);
+    return JSON.stringify(payload);
+  } catch (error) {
+    throw new Error(error.message);
+  }
 };
 
 const isAdmin = (roles) => {
