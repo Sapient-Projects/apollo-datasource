@@ -1,4 +1,6 @@
 const { ApolloServer, gql } = require("apollo-server");
+require("dotenv").config();
+const { AuthenticationError } = require("apollo-server-errors");
 const { products } = require("./data");
 const {
   getUser,
@@ -8,9 +10,12 @@ const {
   uid,
   forUserOnly,
 } = require("./util");
-const { AuthenticationError } = require("apollo-server-errors");
 const { Products } = require("./datasources");
-
+const { makeExecutableSchema } = require("@graphql-tools/schema");
+const {
+  uppercaseDirectiveTransformer,
+  lowercaseDirectiveTransformer,
+} = require("./directive");
 const typeDefs = gql`
   type Product {
     upc: ID!
@@ -23,7 +28,12 @@ const typeDefs = gql`
     productForUser(id: ID!): Product
     productForAdmin(id: ID!): Product
     productForUserAndAdmin(id: ID!): Product
+    uppercaseDirectiveTest: String @uppercase
+    lowercaseDirectiveTest: String @lowercase
   }
+
+  directive @uppercase on FIELD_DEFINITION
+  directive @lowercase on FIELD_DEFINITION
 `;
 
 const resolvers = {
@@ -59,12 +69,21 @@ const resolvers = {
         throw new AuthenticationError("access denied...");
       }
     },
+    uppercaseDirectiveTest: () => "hello World in upper!",
+    lowercaseDirectiveTest: () => "hello World in lower!",
   },
 };
 
-const server = new ApolloServer({
+let schema = makeExecutableSchema({
   typeDefs,
   resolvers,
+});
+
+schema = uppercaseDirectiveTransformer(schema, "uppercase");
+schema = lowercaseDirectiveTransformer(schema, "lowercase");
+
+const server = new ApolloServer({
+  schema,
   context: ({ req }) => {
     const token = req.headers.authorization || "";
     const user = getUser(token);
@@ -73,6 +92,12 @@ const server = new ApolloServer({
   dataSources: () => ({
     products: new Products(client.db().collection("products")),
   }),
+  formatError: (err) => {
+    if (err.extensions.code === "UNAUTHENTICATED") {
+      return new Error("Error authenticating the user");
+    }
+    return err;
+  },
 });
 
 server
