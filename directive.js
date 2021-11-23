@@ -1,4 +1,6 @@
 const { mapSchema, getDirective, MapperKind } = require("@graphql-tools/utils");
+const { uid } = require("./util");
+const { ApolloError } = require("apollo-server-errors");
 
 function uppercaseDirectiveTransformer(schema, directiveName) {
   return mapSchema(schema, {
@@ -35,13 +37,13 @@ function lowercaseDirectiveTransformer(schema, directiveName) {
     // Executes once for each object field in the schema
     [MapperKind.OBJECT_FIELD]: (fieldConfig) => {
       // Check whether this field has the specified directive
-      const uppercaseDirective = getDirective(
+      const lowercaseDirective = getDirective(
         schema,
         fieldConfig,
         directiveName
       )?.[0];
 
-      if (uppercaseDirective) {
+      if (lowercaseDirective) {
         // Get this field's original resolver
         const { resolve = defaultFieldResolver } = fieldConfig;
 
@@ -60,7 +62,60 @@ function lowercaseDirectiveTransformer(schema, directiveName) {
   });
 }
 
+function authDirectiveTransformer(schema, directiveName) {
+  return mapSchema(schema, {
+    [MapperKind.OBJECT_FIELD]: (fieldConfig) => {
+      const authDirective = getDirective(
+        schema,
+        fieldConfig,
+        directiveName
+      )?.[0];
+
+      if (authDirective) {
+        const { resolve = defaultFieldResolver } = fieldConfig;
+        fieldConfig.resolve = async function (source, args, context, info) {
+          const result = await resolve(source, args, context, info);
+          const payload = JSON.parse(context.user);
+          // const review = context.dataSources.reviews.getReviewById(args.id);
+          if (payload.uid !== result.authorID) {
+            result.body = null;
+          }
+          return result;
+        };
+      }
+      return fieldConfig;
+    },
+    [MapperKind.OBJECT_TYPE]: (fieldConfig) => {
+      const authDirective = getDirective(
+        schema,
+        fieldConfig,
+        directiveName
+      )?.[0];
+
+      if (authDirective) {
+        // const { resolve = defaultFieldResolver } = fieldConfig;
+        fieldConfig.resolve = async function (source, args, context, info) {
+          const payload = JSON.parse(context.user);
+          if (payload.uid !== uid) {
+            throw new ApolloError(
+              "Cannot get review of another user",
+              "REVIEW_BODY_ACCESS_DENIED",
+              {
+                user: uid,
+              }
+            );
+          }
+          const result = await resolve(source, args, context, info);
+          return result;
+        };
+      }
+      return fieldConfig;
+    },
+  });
+}
+
 module.exports = {
   uppercaseDirectiveTransformer,
-  lowercaseDirectiveTransformer
+  lowercaseDirectiveTransformer,
+  authDirectiveTransformer,
 };

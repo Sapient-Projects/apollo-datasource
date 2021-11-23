@@ -21,6 +21,13 @@ class Products extends MongoDataSource {
   }
 }
 
+class Reviews extends MongoDataSource {
+  getReviewById(id) {
+    return this.findOneById(id);
+  }
+}
+
 module.exports = {
   Products,
+  Reviews,
 };
