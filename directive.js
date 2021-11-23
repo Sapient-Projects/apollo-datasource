@@ -1,6 +1,7 @@
 const { mapSchema, getDirective, MapperKind } = require("@graphql-tools/utils");
 const { uid } = require("./util");
 const { ApolloError } = require("apollo-server-errors");
+const { defaultFieldResolver } = require('graphql');
 
 function uppercaseDirectiveTransformer(schema, directiveName) {
   return mapSchema(schema, {
@@ -64,6 +65,8 @@ function lowercaseDirectiveTransformer(schema, directiveName) {
 
 function authDirectiveTransformer(schema, directiveName) {
   return mapSchema(schema, {
+
+    // for a field
     [MapperKind.OBJECT_FIELD]: (fieldConfig) => {
       const authDirective = getDirective(
         schema,
@@ -76,7 +79,6 @@ function authDirectiveTransformer(schema, directiveName) {
         fieldConfig.resolve = async function (source, args, context, info) {
           const result = await resolve(source, args, context, info);
           const payload = JSON.parse(context.user);
-          // const review = context.dataSources.reviews.getReviewById(args.id);
           if (payload.uid !== result.authorID) {
             result.body = null;
           }
@@ -85,6 +87,8 @@ function authDirectiveTransformer(schema, directiveName) {
       }
       return fieldConfig;
     },
+
+    // for a type
     [MapperKind.OBJECT_TYPE]: (fieldConfig) => {
       const authDirective = getDirective(
         schema,
@@ -93,19 +97,14 @@ function authDirectiveTransformer(schema, directiveName) {
       )?.[0];
 
       if (authDirective) {
-        // const { resolve = defaultFieldResolver } = fieldConfig;
+        const { resolve = defaultFieldResolver } = fieldConfig;
         fieldConfig.resolve = async function (source, args, context, info) {
-          const payload = JSON.parse(context.user);
-          if (payload.uid !== uid) {
-            throw new ApolloError(
-              "Cannot get review of another user",
-              "REVIEW_BODY_ACCESS_DENIED",
-              {
-                user: uid,
-              }
-            );
-          }
           const result = await resolve(source, args, context, info);
+          const payload = JSON.parse(context.user);
+          console.log("hello");
+          if (payload.uid !== result.authorID) {
+            result.body = null;
+          }
           return result;
         };
       }

@@ -3,7 +3,7 @@ const jwt_decode = require("jwt-decode");
 const { MongoClient } = require("mongodb");
 require("dotenv").config();
 
-const uid = "user123";
+const uid = "user12";
 
 const mongodbConnectionString = `mongodb://${process.env.MONGODB_USERNAME}:${process.env.MONGODB_PASSWORD}@localhost/demo?authSource=admin`;
 const client = new MongoClient(mongodbConnectionString);

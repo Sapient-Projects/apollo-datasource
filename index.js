@@ -2,6 +2,7 @@ const { ApolloServer, gql } = require("apollo-server");
 require("dotenv").config();
 const { ForbiddenError } = require("apollo-server-core");
 const { products } = require("./data");
+
 const {
   getUser,
   forAdminOnly,
@@ -11,12 +12,15 @@ const {
   forUserOnly,
 } = require("./util");
 const { Products, Reviews } = require("./datasources");
+
 const { makeExecutableSchema } = require("@graphql-tools/schema");
+
 const {
   uppercaseDirectiveTransformer,
   lowercaseDirectiveTransformer,
   authDirectiveTransformer,
 } = require("./directive");
+
 const typeDefs = gql`
   type Product {
     upc: ID!
@@ -45,8 +49,9 @@ const typeDefs = gql`
 `;
 
 const resolvers = {
+
   Query: {
-    productForUser: (_, args, context) => {
+    productForUser: (parent, args, context) => {
       const payload = JSON.parse(context.user);
       if (payload && payload.uid === uid && forUserOnly(payload.roles)) {
         return context.dataSources.products.getProductById(args.id);
@@ -56,6 +61,7 @@ const resolvers = {
         throw new ForbiddenError("access denied...");
       }
     },
+
     productForAdmin: (_, args, context) => {
       const payload = JSON.parse(context.user);
       if (payload && payload.uid === uid && forAdminOnly(payload.roles)) {
@@ -66,6 +72,7 @@ const resolvers = {
         throw new ForbiddenError("access denied...");
       }
     },
+
     productForUserAndAdmin: (_, args, context) => {
       const payload = JSON.parse(context.user);
       if (payload && payload.uid === uid && forAdminAndUser(payload.roles)) {
@@ -76,8 +83,11 @@ const resolvers = {
         throw new ForbiddenError("access denied...");
       }
     },
+
     uppercaseDirectiveTest: () => "hello World in upper!",
+
     lowercaseDirectiveTest: () => "hello World in lower!",
+
     review: (_, args, context) => {
       const payload = JSON.parse(context.user);
       if (payload && payload.uid === uid) {
@@ -89,6 +99,7 @@ const resolvers = {
   },
 };
 
+
 let schema = makeExecutableSchema({
   typeDefs,
   resolvers,
@@ -99,16 +110,24 @@ schema = lowercaseDirectiveTransformer(schema, "lowercase");
 schema = authDirectiveTransformer(schema, "hiddenForOtherUsers");
 
 const server = new ApolloServer({
+
+  // typedefs, resolvers, directives
   schema,
+
+  // making user info available inside all resolvers
   context: ({ req }) => {
     const token = req.headers.authorization || "";
     const user = getUser(token);
     return { user };
   },
+
+  // define where to fetch data from
   dataSources: () => ({
     products: new Products(client.db().collection("products")),
     reviews: new Reviews(client.db().collection("reviews")),
   }),
+
+  // return custom error messages
   formatError: (err) => {
     if (err.extensions.code === "FORBIDDEN") {
       return new Error("Access denied");
