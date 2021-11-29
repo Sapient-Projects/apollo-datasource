@@ -135,11 +135,12 @@ const server = new ApolloServer({
     if (err.extensions.code === "UNAUTHENTICATED") {
       return new Error("Error authenticating the user");
     }
-    if (err.extensions.code === "REVIEW_BODY_ACCESS_DENIED") {
-      return new Error("Cannot get review body");
-    }
+    // if (err.extensions.code === "REVIEW_BODY_ACCESS_DENIED") {
+    //   return new Error("Cannot get review body");
+    // }
     return err;
   },
+  introspection: true
 });
 
 server

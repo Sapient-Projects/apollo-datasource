@@ -5,12 +5,13 @@ require("dotenv").config();
 
 const uid = "user12";
 
-const mongodbConnectionString = `mongodb://${process.env.MONGODB_USERNAME}:${process.env.MONGODB_PASSWORD}@localhost/demo?authSource=admin`;
+const mongodbConnectionString = `mongodb://pradubey7:admin@localhost/demo?authSource=admin`;
 const client = new MongoClient(mongodbConnectionString);
 client.connect();
 
 const getUser = (token) => {
-  if (!token) return null;
+  if (!token) 
+    return null;
   const strippedToken = token.slice(7);
   const payload = jwt_decode(strippedToken);
   if (payload.uid !== uid) {
