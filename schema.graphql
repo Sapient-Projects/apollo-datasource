@@ -1,0 +1,24 @@
+type Product {
+  upc: ID!
+  name: String!
+  weight: Int!
+  price: Int!
+}
+
+type Review {
+  authorID: String!
+  body: String @hiddenForOtherUsers
+}
+
+type Query {
+  productForUser(id: ID!): Product
+  productForAdmin(id: ID!): Product
+  productForUserAndAdmin(id: ID!): Product
+  uppercaseDirectiveTest: String @uppercase
+  lowercaseDirectiveTest: String @lowercase
+  review(id: ID!): Review
+}
+
+directive @uppercase on FIELD_DEFINITION
+directive @lowercase on FIELD_DEFINITION
+directive @hiddenForOtherUsers on FIELD_DEFINITION | OBJECT

@@ -5,7 +5,11 @@ require("dotenv").config();
 
 const uid = "user12";
 
-const mongodbConnectionString = `mongodb://pradubey7:admin@localhost/demo?authSource=admin`;
+const MONGODB_USERNAME = process.env.MONGODB_USERNAME || "";
+const MONGODB_PASSWORD = process.env.MONGODB_PASSWORD || "";
+const MONGODB_AUTHSOURCE = process.env.MONGODB_AUTHSOURCE || "";
+
+const mongodbConnectionString = `mongodb://${MONGODB_USERNAME}:${MONGODB_PASSWORD}@localhost/demo${MONGODB_AUTHSOURCE}`;
 const client = new MongoClient(mongodbConnectionString);
 client.connect();
 
