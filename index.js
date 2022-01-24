@@ -1,146 +1,50 @@
 const { ApolloServer, gql } = require("apollo-server");
-require("dotenv").config();
-const { ForbiddenError } = require("apollo-server-core");
-const { products } = require("./data");
+const { Pool } = require("undici");
 
-const {
-  getUser,
-  forAdminOnly,
-  forAdminAndUser,
-  client,
-  uid,
-  forUserOnly,
-} = require("./util");
-const { Products, Reviews } = require("./datasources");
+const { User } = require("./datasources");
 
-const { makeExecutableSchema } = require("@graphql-tools/schema");
-
-const {
-  uppercaseDirectiveTransformer,
-  lowercaseDirectiveTransformer,
-  authDirectiveTransformer,
-} = require("./directive");
+const baseURL = "http://localhost:3000";
+const pool = new Pool(baseURL);
 
 const typeDefs = gql`
-  type Product {
-    upc: ID!
+  type User {
+    id: String!
     name: String!
-    weight: Int!
-    price: Int!
-  }
-
-  type Review {
-    authorID: String!
-    body: String @hiddenForOtherUsers
+    birthDate: String!
+    username: String!
   }
 
   type Query {
-    productForUser(id: ID!): Product
-    productForAdmin(id: ID!): Product
-    productForUserAndAdmin(id: ID!): Product
-    uppercaseDirectiveTest: String @uppercase
-    lowercaseDirectiveTest: String @lowercase
-    review(id: ID!): Review
+    getUsers: [User]
+    getUserById(id: ID): User
   }
-
-  directive @uppercase on FIELD_DEFINITION
-  directive @lowercase on FIELD_DEFINITION
-  directive @hiddenForOtherUsers on FIELD_DEFINITION | OBJECT
 `;
 
 const resolvers = {
-
   Query: {
-    productForUser: (parent, args, context) => {
-      const payload = JSON.parse(context.user);
-      if (payload && payload.uid === uid && forUserOnly(payload.roles)) {
-        return context.dataSources.products.getProductById(args.id);
-      } else if (!payload) {
-        throw new ForbiddenError("log in first...");
-      } else if (payload.uid !== uid || !forUserOnly(payload.roles)) {
-        throw new ForbiddenError("access denied...");
-      }
+    getUsers: async (_, __, context) => {
+      const response = await context.dataSources.usersAPI.getUsers();
+      const users = response.body;
+      return users;
     },
 
-    productForAdmin: (_, args, context) => {
-      const payload = JSON.parse(context.user);
-      if (payload && payload.uid === uid && forAdminOnly(payload.roles)) {
-        return context.dataSources.products.getProductById(args.id);
-      } else if (!payload) {
-        throw new ForbiddenError("log in first...");
-      } else if (payload.uid !== uid || !forAdminOnly(payload.roles)) {
-        throw new ForbiddenError("access denied...");
-      }
-    },
-
-    productForUserAndAdmin: (_, args, context) => {
-      const payload = JSON.parse(context.user);
-      if (payload && payload.uid === uid && forAdminAndUser(payload.roles)) {
-        return context.dataSources.products.getProductById(args.id);
-      } else if (!payload) {
-        throw new ForbiddenError("log in first...");
-      } else if (payload.uid !== uid || !forAdminAndUser(payload.roles)) {
-        throw new ForbiddenError("access denied...");
-      }
-    },
-
-    uppercaseDirectiveTest: () => "hello World in upper!",
-
-    lowercaseDirectiveTest: () => "hello World in lower!",
-
-    review: (_, args, context) => {
-      const payload = JSON.parse(context.user);
-      if (payload && payload.uid === uid) {
-        return context.dataSources.reviews.getReviewById(args.id);
-      } else if (!payload) {
-        throw new ForbiddenError("log in first...");
-      }
+    getUserById: async (_, args, context) => {
+      const response = await context.dataSources.usersAPI.getUserById(args.id);
+      const user = response.body;
+      return user;
     },
   },
 };
 
-
-let schema = makeExecutableSchema({
+const server = new ApolloServer({
+  // typedefs, resolvers, directives
   typeDefs,
   resolvers,
-});
-
-schema = uppercaseDirectiveTransformer(schema, "uppercase");
-schema = lowercaseDirectiveTransformer(schema, "lowercase");
-schema = authDirectiveTransformer(schema, "hiddenForOtherUsers");
-
-const server = new ApolloServer({
-
-  // typedefs, resolvers, directives
-  schema,
-
-  // making user info available inside all resolvers
-  context: ({ req }) => {
-    const token = req.headers.authorization || "";
-    const user = getUser(token);
-    return { user };
-  },
 
   // define where to fetch data from
   dataSources: () => ({
-    products: new Products(client.db().collection("products")),
-    reviews: new Reviews(client.db().collection("reviews")),
+    usersAPI: new User(baseURL, pool),
   }),
-
-  // return custom error messages
-  formatError: (err) => {
-    if (err.extensions.code === "FORBIDDEN") {
-      return new Error("Access denied");
-    }
-    if (err.extensions.code === "UNAUTHENTICATED") {
-      return new Error("Error authenticating the user");
-    }
-    // if (err.extensions.code === "REVIEW_BODY_ACCESS_DENIED") {
-    //   return new Error("Cannot get review body");
-    // }
-    return err;
-  },
-  introspection: true
 });
 
 server
