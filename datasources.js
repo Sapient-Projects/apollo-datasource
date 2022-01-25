@@ -7,11 +7,22 @@ class User extends HTTPDataSource {
   }
 
   async getUserById(id) {
-    return this.get(`${this.baseURL}/users/${id}`)
+    return this.get(`${this.baseURL}/users/${id}`);
   }
 
   async getUsers() {
     return this.get(`${this.baseURL}/users`);
+  }
+
+  async createUser({ id, name, birthDate, username }) {
+    return this.post(`${this.baseURL}/users`, {
+      body: {
+        id,
+        name,
+        birthDate,
+        username,
+      },
+    });
   }
 }
 

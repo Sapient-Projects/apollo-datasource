@@ -18,6 +18,10 @@ const typeDefs = gql`
     getUsers: [User]
     getUserById(id: ID): User
   }
+
+  type Mutation {
+    createUser(id: ID, name: String, birthDate: String, username: String): User
+  }
 `;
 
 const resolvers = {
@@ -34,6 +38,13 @@ const resolvers = {
       return user;
     },
   },
+
+  Mutation: {
+    createUser: async (_, args, context) => {
+      const response = await context.dataSources.usersAPI.createUser(args);
+      return response.body;
+    }
+  }
 };
 
 const server = new ApolloServer({
