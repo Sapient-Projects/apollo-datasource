@@ -1,33 +1,42 @@
-const { MongoDataSource } = require("apollo-datasource-mongodb");
-const { AuthenticationError } = require("apollo-server-errors");
-const uid = require("./util");
-class Products extends MongoDataSource {
-  getProductById(id) {
-    // console.log("id = " + id);
-    return this.findOneById(id);
+const { HTTPDataSource } = require("apollo-datasource-http");
+const { DuplicateIdError } = require("./errors/duplicateIdError");
+class User extends HTTPDataSource {
+  constructor(baseURL, pool) {
+    super(baseURL, { pool });
+    this.baseURL = baseURL;
   }
-  getAllProducts() {
-    return this.collection.find(32);
+
+  async getUserById(id) {
+    return this.get(`${this.baseURL}/users/${id}`);
   }
-  getProductByFields(id) {
-    const user = JSON.parse(this.context.user);
-    if (user.uid === uid) {
-      return this.findByFields({ id });
-    } else {
-      throw new AuthenticationError(
-        "user not authorized to perform this operation..."
-      );
+
+  async getUsers() {
+    return this.get(`${this.baseURL}/users`);
+  }
+
+  async createUser({ id, name, birthDate, username }) {
+    const users = await this.getUsers();
+    const user = users.body.find(u => u.id === id);
+    if (user) {
+      throw new DuplicateIdError("user with id: " + id + " already exists!");
+    }
+    return this.post(`${this.baseURL}/users`, {
+      body: {
+        id,
+        name,
+        birthDate,
+        username,
+      },
+    });
+  }
+
+  onError(error, request) {
+    if (error instanceof DuplicateIdError) {
+      console.log(error.request);
     }
   }
 }
 
-class Reviews extends MongoDataSource {
-  getReviewById(id) {
-    return this.findOneById(id);
-  }
-}
-
 module.exports = {
-  Products,
-  Reviews,
+  User,
 };

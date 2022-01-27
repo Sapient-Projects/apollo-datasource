@@ -13,12 +13,19 @@
   "dependencies": {
     "@graphql-tools/schema": "^8.3.1",
     "@graphql-tools/utils": "^8.5.3",
+    "apollo-datasource-http": "^0.18.0",
     "apollo-datasource-mongodb": "^0.5.2",
     "apollo-server": "latest",
     "apollo-server-errors": "latest",
+    "apollo-server-express": "^3.6.2",
+    "express": "^4.17.2",
     "graphql": "latest",
+    "graphql-kafka-subscriptions": "^0.4.0",
+    "graphql-subscriptions": "^2.0.0",
     "jwt-decode": "latest",
-    "mongodb": "^4.1.4"
+    "mongodb": "^4.1.4",
+    "subscriptions-transport-ws": "^0.11.0",
+    "undici": "^4.12.2"
   },
   "devDependencies": {
     "dotenv": "^10.0.0"

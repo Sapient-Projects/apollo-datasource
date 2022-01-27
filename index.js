@@ -1,153 +1,105 @@
-const { ApolloServer, gql } = require("apollo-server");
-require("dotenv").config();
-const { ForbiddenError } = require("apollo-server-core");
-const { products } = require("./data");
-
-const {
-  getUser,
-  forAdminOnly,
-  forAdminAndUser,
-  client,
-  uid,
-  forUserOnly,
-} = require("./util");
-const { Products, Reviews } = require("./datasources");
-
+const { ApolloServer } = require("apollo-server-express");
+const { KafkaPubSub } = require("graphql-kafka-subscriptions");
+const { gql } = require("apollo-server");
+const express = require("express");
+const { createServer } = require("http");
+const { execute, subscribe } = require("graphql");
+const { SubscriptionServer } = require("subscriptions-transport-ws");
 const { makeExecutableSchema } = require("@graphql-tools/schema");
+const { PubSub } = require("graphql-subscriptions");
+const { User } = require("./datasources");
+const { Pool } = require("undici");
+const { DuplicateIdError } = require("./errors/duplicateIdError");
 
-const {
-  uppercaseDirectiveTransformer,
-  lowercaseDirectiveTransformer,
-  authDirectiveTransformer,
-} = require("./directive");
+const baseURL = "http://localhost:3000";
+const pool = new Pool(baseURL);
+
+const pubsub = new KafkaPubSub({
+  host: "localhost",
+  port: "29092",
+  topic: "users-graphql"
+});
 
 const typeDefs = gql`
-  type Product {
-    upc: ID!
+  type User {
+    id: String!
     name: String!
-    weight: Int!
-    price: Int!
+    birthDate: String!
+    username: String!
   }
-
-  type Review {
-    authorID: String!
-    body: String @hiddenForOtherUsers
-  }
-
   type Query {
-    productForUser(id: ID!): Product
-    productForAdmin(id: ID!): Product
-    productForUserAndAdmin(id: ID!): Product
-    uppercaseDirectiveTest: String @uppercase
-    lowercaseDirectiveTest: String @lowercase
-    review(id: ID!): Review
+    getUsers: [User]
   }
-
-  directive @uppercase on FIELD_DEFINITION
-  directive @lowercase on FIELD_DEFINITION
-  directive @hiddenForOtherUsers on FIELD_DEFINITION | OBJECT
+  type Mutation {
+    createUser(id: ID, name: String, birthDate: String, username: String): User
+  }
+  type Subscription {
+    userCreated: User
+  }
 `;
 
 const resolvers = {
-
   Query: {
-    productForUser: (parent, args, context) => {
-      const payload = JSON.parse(context.user);
-      if (payload && payload.uid === uid && forUserOnly(payload.roles)) {
-        return context.dataSources.products.getProductById(args.id);
-      } else if (!payload) {
-        throw new ForbiddenError("log in first...");
-      } else if (payload.uid !== uid || !forUserOnly(payload.roles)) {
-        throw new ForbiddenError("access denied...");
-      }
+    getUsers: async (_, __, context) => {
+      const response = await context.dataSources.usersAPI.getUsers();
+      return response.body;
     },
-
-    productForAdmin: (_, args, context) => {
-      const payload = JSON.parse(context.user);
-      if (payload && payload.uid === uid && forAdminOnly(payload.roles)) {
-        return context.dataSources.products.getProductById(args.id);
-      } else if (!payload) {
-        throw new ForbiddenError("log in first...");
-      } else if (payload.uid !== uid || !forAdminOnly(payload.roles)) {
-        throw new ForbiddenError("access denied...");
-      }
+  },
+  Mutation: {
+    createUser: async (_, args, context) => {
+      const response = await context.dataSources.usersAPI.createUser(args);
+      pubsub.publish("USER_CREATED", { userCreated: args });
+      return response.body;
     },
-
-    productForUserAndAdmin: (_, args, context) => {
-      const payload = JSON.parse(context.user);
-      if (payload && payload.uid === uid && forAdminAndUser(payload.roles)) {
-        return context.dataSources.products.getProductById(args.id);
-      } else if (!payload) {
-        throw new ForbiddenError("log in first...");
-      } else if (payload.uid !== uid || !forAdminAndUser(payload.roles)) {
-        throw new ForbiddenError("access denied...");
-      }
-    },
-
-    uppercaseDirectiveTest: () => "hello World in upper!",
-
-    lowercaseDirectiveTest: () => "hello World in lower!",
-
-    review: (_, args, context) => {
-      const payload = JSON.parse(context.user);
-      if (payload && payload.uid === uid) {
-        return context.dataSources.reviews.getReviewById(args.id);
-      } else if (!payload) {
-        throw new ForbiddenError("log in first...");
-      }
+  },
+  Subscription: {
+    userCreated: {
+      subscribe: () => pubsub.asyncIterator(["USER_CREATED"]),
     },
   },
 };
 
+(async function () {
+  const app = express();
+  const httpServer = createServer(app);
 
-let schema = makeExecutableSchema({
-  typeDefs,
-  resolvers,
-});
-
-schema = uppercaseDirectiveTransformer(schema, "uppercase");
-schema = lowercaseDirectiveTransformer(schema, "lowercase");
-schema = authDirectiveTransformer(schema, "hiddenForOtherUsers");
-
-const server = new ApolloServer({
-
-  // typedefs, resolvers, directives
-  schema,
-
-  // making user info available inside all resolvers
-  context: ({ req }) => {
-    const token = req.headers.authorization || "";
-    const user = getUser(token);
-    return { user };
-  },
-
-  // define where to fetch data from
-  dataSources: () => ({
-    products: new Products(client.db().collection("products")),
-    reviews: new Reviews(client.db().collection("reviews")),
-  }),
-
-  // return custom error messages
-  formatError: (err) => {
-    if (err.extensions.code === "FORBIDDEN") {
-      return new Error("Access denied");
-    }
-    if (err.extensions.code === "UNAUTHENTICATED") {
-      return new Error("Error authenticating the user");
-    }
-    // if (err.extensions.code === "REVIEW_BODY_ACCESS_DENIED") {
-    //   return new Error("Cannot get review body");
-    // }
-    return err;
-  },
-  introspection: true
-});
-
-server
-  .listen()
-  .then(({ url }) => {
-    console.log(`Gateway ready at ${url}`);
-  })
-  .catch((err) => {
-    console.error(err);
+  const schema = makeExecutableSchema({
+    typeDefs,
+    resolvers,
   });
+
+  const subscriptionServer = SubscriptionServer.create(
+    { schema, execute, subscribe },
+    { server: httpServer, path: "/graphql" }
+  );
+
+  const server = new ApolloServer({
+    schema,
+    plugins: [
+      {
+        async serverWillStart() {
+          return {
+            async drainServer() {
+              subscriptionServer.close();
+            },
+          };
+        },
+      },
+    ],
+    dataSources: () => ({
+      usersAPI: new User(baseURL, pool),
+    }),
+    formatError: (err) => {
+      if (err.originalError instanceof DuplicateIdError) {
+        return new Error(err.message);
+      }
+      return err;
+    },
+  });
+  await server.start();
+  server.applyMiddleware({ app });
+  const PORT = 4000;
+  httpServer.listen(PORT, () =>
+    console.log(`Server is now running on http://localhost:${PORT}/graphql`)
+  );
+})();
