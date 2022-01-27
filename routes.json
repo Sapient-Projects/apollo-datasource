@@ -1,4 +1,0 @@
-{
-  "/products/:id": "/products?upc=:id",
-  "/inventory/:id": "/inventory?upc=:id"
-}
