@@ -1,5 +1,5 @@
 const { HTTPDataSource } = require("apollo-datasource-http");
-
+const { DuplicateIdError } = require("./errors/duplicateIdError");
 class User extends HTTPDataSource {
   constructor(baseURL, pool) {
     super(baseURL, { pool });
@@ -15,6 +15,11 @@ class User extends HTTPDataSource {
   }
 
   async createUser({ id, name, birthDate, username }) {
+    const users = await this.getUsers();
+    const user = users.body.find(u => u.id === id);
+    if (user) {
+      throw new DuplicateIdError("user with id: " + id + " already exists!");
+    }
     return this.post(`${this.baseURL}/users`, {
       body: {
         id,
@@ -23,6 +28,12 @@ class User extends HTTPDataSource {
         username,
       },
     });
+  }
+
+  onError(error, request) {
+    if (error instanceof DuplicateIdError) {
+      console.log(error.request);
+    }
   }
 }
 

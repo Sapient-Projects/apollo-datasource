@@ -2,6 +2,7 @@ const { ApolloServer, gql } = require("apollo-server");
 const { Pool } = require("undici");
 
 const { User } = require("./datasources");
+const { DuplicateIdError } = require("./errors/duplicateIdError");
 
 const baseURL = "http://localhost:3000";
 const pool = new Pool(baseURL);
@@ -56,6 +57,12 @@ const server = new ApolloServer({
   dataSources: () => ({
     usersAPI: new User(baseURL, pool),
   }),
+  formatError: (err) => {
+    if (err.originalError instanceof DuplicateIdError) {
+      return new Error(err.message);
+    }
+    return err;
+  }
 });
 
 server
